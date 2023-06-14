@@ -42,7 +42,7 @@ module.exports = function (app) {
         });
 
         await rp.update({
-          player_2_id : player_id
+          player_2 : player_id
         });
 
         ws.player2 = player_id
@@ -50,40 +50,45 @@ module.exports = function (app) {
       }
       
       // Handle incoming messages
-      ws.on("message", async (msg) => {
-        if (ws.me == ws.player1) {
-          
-          const rpp = await Room_Player.findOne({
-            where: {
-              room_id: req.params.room_id,
-              player_id : req.query.player_id
-            }
-          });
+// ...
 
-          if (rpp.dataValues.player2 == null) {
-            rooms[room].forEach(connection => {
-              connection.send(
-                JSON.stringify({
-                  message: "No player_2!"
-                })
-              );
-            });
-          }
+ws.on("message", async (msg) => {
+  if (ws.me === ws.player1) {
+    const rpp = await Room_Player.findOne({
+      where: {
+        room_id: req.params.room_id,
+        player_id: req.query.player_id
+      }
+    });
 
-        } else {
-          
-          rooms[room].forEach(connection => {
-            connection.send(
-              JSON.stringify({
-                message: msg,
-                sent_by: player_id,
-                isRead: false
-              })
-            );
-          });
-        }
-        // Send the new message to all WebSocket connections in the chat room
+    if (rpp.dataValues.player_2 === null) {
+      rooms[room].forEach(connection => {
+        connection.send(
+          JSON.stringify({
+            message: "No player-2!"
+          })
+        );
       });
+    }
+    rooms[room].forEach(connection => {
+      connection.send(
+        JSON.stringify({
+          message: msg
+        })
+      );
+    });
+  } else {
+    rooms[room].forEach(connection => {
+      connection.send(
+        JSON.stringify({
+          message: msg,
+          sent_by: ws.me,
+          isRead: false
+        })
+      );
+    });
+  }
+});
 
       ws.on("close", async () => {
        
