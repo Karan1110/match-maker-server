@@ -16,13 +16,14 @@ const Room = db.define('Room', {
     },
     player_count: {
         type: Sequelize.INTEGER,
-        defaultValue : 1
+        defaultValue : 1 
     },
     gameType: {
         type: Sequelize.STRING,
         defaultValue : "general"
     },
-    current_room_player_id : Sequelize.INTEGER
+    current_player1 : Sequelize.INTEGER,
+    current_player2 : Sequelize.INTEGER
 });
 Room.belongsToMany(Player, {
     through: room_player,
