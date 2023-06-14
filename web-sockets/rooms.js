@@ -1,6 +1,7 @@
 
 const Room = require("../models/room");
 const Room_Player = require("../models/intermediate_models/room_player");
+const sequelize = require("sequelize");
 
 module.exports = function (app) {
   require("express-ws")(app);
@@ -22,12 +23,12 @@ module.exports = function (app) {
       if (!rooms[room]) {
         rooms[room] = [];
       }
-
+      let rp;
       // Add the WebSocket connection to the chat room
       rooms[room].push(ws);
 
       if (req.query.player1 === "true") {
-        const new_rp = await Room_Player.create({
+       rp = await Room_Player.create({
           room_id: req.params.room_id,
           player_id : req.query.player_id
         });
@@ -36,7 +37,7 @@ module.exports = function (app) {
         ws.me = ws.player1;
 
       } else {
-        const rp = await Room_Player.findOne({
+       rp = await Room_Player.findOne({
           room_id: req.params.room_id,
           player_id : req.query.player_id
         });
@@ -49,50 +50,106 @@ module.exports = function (app) {
         ws.me = ws.player2;
       }
       
-      // Handle incoming messages
+      // Handle incoming msgs
 // ...
 
-ws.on("message", async (msg) => {
+      ws.on("message", async (message) => {
+        const msg = JSON.parse(message);
   if (ws.me === ws.player1) {
-    const rpp = await Room_Player.findOne({
-      where: {
-        room_id: req.params.room_id,
-        player_id: req.query.player_id
+    // Check if ws.player_2 is not set or null
+    if (ws.player_2 == null || undefined) {
+      const rpp = await Room_Player.findOne({
+        where: {
+          room_id: req.params.room_id,
+          player_id: req.query.player_id
+        }
+      });
+  
+      // Update ws.player_2 and perform actions accordingly
+      ws.player_2 = rpp.dataValues.player_2;
+  
+      if (ws.player_2 === null) {
+        rooms[room].forEach(connection => {
+          connection.send(
+            JSON.stringify({
+              msg: "No player-2!"
+            })
+          );
+        });
+      } else if (msg.normalChat) {
+        rooms[room].forEach(connection => {
+          connection.send(
+            JSON.stringify({
+              msg: msg
+            })
+          );
+        });
+      } else if (msg.updatePP) {
+        rooms[room].forEach(connection => {
+          connection.send(
+            JSON.stringify({
+              msg: "updated player_2 points...",
+              sent_by: ws.me,
+              isRead: false
+            })
+          );
+        });
+        await rp.update({
+          player_points: sequelize.literal('player_points + 1')
+        });
       }
-    });
-
-    if (rpp.dataValues.player_2 === null) {
+    } else {
+      if (msg.normalChat == true || "true") {
+        rooms[room].forEach(connection => {
+          connection.send(
+            JSON.stringify({
+              msg: msg
+            })
+          );
+        });
+      } else if (msg.updatePP == true || "true") {
+        rooms[room].forEach(connection => {
+          connection.send(
+            JSON.stringify({
+              msg: "updated player_2 points...",
+              sent_by: ws.me,
+              isRead: false
+            })
+          );
+        });
+        await rp.update({
+          player_points: sequelize.literal('player_points + 1')
+        });
+      }
+    }
+  } else {
+    // Rest of your code
+    if (msg.normalChat) {
       rooms[room].forEach(connection => {
         connection.send(
           JSON.stringify({
-            message: "No player-2!"
+            msg: msg
           })
         );
       });
+    } else if (msg.updatePP) {
+      rooms[room].forEach(connection => {
+        connection.send(
+          JSON.stringify({
+            msg: "updated player_2 points...",
+            sent_by: ws.me,
+            isRead: false
+          })
+        );
+      });
+      await rp.update({
+        player_points: sequelize.literal('player_points + 1')
+      });
     }
-    rooms[room].forEach(connection => {
-      connection.send(
-        JSON.stringify({
-          message: msg
-        })
-      );
-    });
-  } else {
-    rooms[room].forEach(connection => {
-      connection.send(
-        JSON.stringify({
-          message: msg,
-          sent_by: ws.me,
-          isRead: false
-        })
-      );
-    });
   }
 });
-
+      
       ws.on("close", async () => {
-       
-
         // Remove the WebSocket connection from the chat room
         rooms[room] = rooms[room].filter(connection => connection !== ws);
       });
